@@ -8,7 +8,11 @@
       <q-card-section>
         <div class="row justify-center">
           <div class="col-12 q-pb-md">
-            <q-input v-model="todoTask" label="Input Task">
+            <q-input
+              v-model="todoTask"
+              label="Input Task"
+              @keyup.enter="addItem"
+            >
               <template v-slot:after>
                 <q-btn round dense flat icon="send" @click="addItem" />
               </template>
@@ -47,8 +51,34 @@
 
 <script>
 import { defineComponent } from "vue";
+import { useQuasar } from "quasar";
 
 export default defineComponent({
+  setup() {
+    const $q = useQuasar();
+
+    return {
+      emptyNotif() {
+        $q.notify({
+          message: "Task input is empty",
+          color: "red",
+        });
+      },
+      completedNotif() {
+        $q.notify({
+          message: "Task completed",
+          color: "green",
+        });
+      },
+      addedNotif() {
+        $q.notify({
+          message: "Task added",
+          color: "purple",
+        });
+      },
+    };
+  },
+
   name: "PageIndex",
   data() {
     return {
@@ -65,10 +95,17 @@ export default defineComponent({
   },
   methods: {
     addItem() {
-      this.todoList.push({ value: this.todoTask });
+      if (this.todoTask !== "") {
+        this.todoList.push({ value: this.todoTask });
+        this.todoTask = "";
+        this.addedNotif();
+      } else {
+        this.emptyNotif();
+      }
     },
     removeItem(index) {
       this.todoList.splice(index, 1);
+      this.completedNotif();
     },
   },
 });
