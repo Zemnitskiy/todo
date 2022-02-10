@@ -14,7 +14,7 @@
               @keyup.enter="addItem"
             >
               <template v-slot:after>
-                <q-btn round dense flat icon="send" @click="addItem" />
+                <q-btn round dense flat icon="send" @click="addItem()" />
               </template>
             </q-input>
           </div>
@@ -24,16 +24,12 @@
       <q-separator />
 
       <q-card-section v-if="todoList.length > 0">
-        <div
-          class="row justify-center"
-          v-for="(item, index) in todoList"
-          :key="index"
-        >
+        <div class="row justify-center" v-for="item in todoList" :key="item.id">
           <div class="col-8 q-py-md">
             {{ item.value }}
           </div>
           <div class="col-auto q-py-md">
-            <q-btn round dense flat icon="done" @click="removeItem(index)" />
+            <q-btn round dense flat icon="done" @click="removeItem(item)" />
           </div>
         </div>
       </q-card-section>
@@ -52,28 +48,43 @@
 <script>
 import { defineComponent } from "vue";
 import { useQuasar } from "quasar";
+import db from "src/boot/firebase";
+import {
+  collection,
+  query,
+  onSnapshot,
+  addDoc,
+  doc,
+  deleteDoc,
+} from "firebase/firestore";
 
 export default defineComponent({
   setup() {
     const $q = useQuasar();
 
     return {
-      emptyNotif() {
+      emptyNotif(position) {
         $q.notify({
           message: "Task input is empty",
-          color: "red",
+          color: "blue",
+          type: "negative",
+          position,
         });
       },
-      completedNotif() {
+      completedNotif(position) {
         $q.notify({
           message: "Task completed",
           color: "green",
+          type: "positive",
+          position,
         });
       },
-      addedNotif() {
+      addedNotif(position) {
         $q.notify({
           message: "Task added",
-          color: "purple",
+          color: "green",
+          type: "info",
+          position,
         });
       },
     };
@@ -83,30 +94,53 @@ export default defineComponent({
   data() {
     return {
       todoTask: "",
-      todoList: [
-        {
-          value: "Create an app",
-        },
-        {
-          value: "Build an app",
-        },
-      ],
+      todoList: [],
     };
   },
   methods: {
     addItem() {
       if (this.todoTask !== "") {
-        this.todoList.push({ value: this.todoTask });
+        let newTodo = {
+          value: this.todoTask,
+        };
+
+        // Add a new document with a generated id.
+        addDoc(collection(db, "todoList"), newTodo);
+
         this.todoTask = "";
-        this.addedNotif();
+        this.addedNotif("bottom-right");
       } else {
-        this.emptyNotif();
+        this.emptyNotif("bottom-right");
       }
     },
-    removeItem(index) {
-      this.todoList.splice(index, 1);
-      this.completedNotif();
+    removeItem(item) {
+      deleteDoc(doc(db, "todoList", item.id));
+      this.completedNotif("bottom-right");
     },
+  },
+  mounted() {
+    const q = query(collection(db, "todoList"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        let todoChange = change.doc.data();
+        todoChange.id = change.doc.id;
+
+        if (change.type === "added") {
+          console.log("New todo: ", todoChange);
+          this.todoList.push(todoChange);
+        }
+        if (change.type === "modified") {
+          console.log("Modified todo: ", todoChange);
+        }
+        if (change.type === "removed") {
+          console.log("Removed todo: ", todoChange);
+          let index = this.todoList.findIndex(
+            (todo) => todo.id === todoChange.id
+          );
+          this.todoList.splice(index, 1);
+        }
+      });
+    });
   },
 });
 </script>
